@@ -61,3 +61,7 @@ test-results/
 .netlify/
 
 # Keep dependency lockfiles, source assets, docs and agent instructions tracked.
+
+# Local PostgreSQL data
+.data/
+next-env.d.ts
