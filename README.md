@@ -32,6 +32,14 @@ ssh -i ~/.brev/brev.pem -p 39798 ubuntu@global.prd.ga.run.brev.nvidia.com
 
 ## CI/CD
 
+**Статус на 23.09.2026:** workflow и SSH Secrets настроены, но GitHub
+не запускает jobs организации из-за биллинга: `The job was not started
+because your account is locked due to a billing issue.`
+[Первый запуск](https://github.com/BAITC-Hacks/hack-8c2d1c68-san-ai/actions/runs/35850883611).
+Владельцу организации нужно снять блокировку и повторить запуск Actions.
+До этого автоматическое обновление при push не работает.
+
+
 Workflow `.github/workflows/ci-cd.yml` запускает `npm ci`, lint, 25 тестов
 и production build для pull request и push в `main`. После успешных проверок
 push в `main` автоматически обновляет Brev. Ручной повтор: GitHub → Actions →
