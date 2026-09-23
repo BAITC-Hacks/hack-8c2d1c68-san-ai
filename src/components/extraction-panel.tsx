@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, LoaderCircle, CheckCircle2 } from "lucide-react";
 import type { StoredDocument } from "@/lib/documents";
+import { extractionRequest, watchExtraction } from "@/lib/extraction-client";
+import type { ExtractionProgress } from "@/lib/extraction-progress";
 import type { ExtractionResult } from "@/lib/extraction";
 import { DocumentExtractionResult } from "./document-extraction-result";
 import styles from "./document-workspace.module.css";
@@ -9,10 +11,11 @@ import styles from "./document-workspace.module.css";
 export function ExtractionPanel({ documents, loading }: { documents: StoredDocument[]; loading: boolean }) {
   const [chosen, setChosen] = useState<string[] | null>(null);
   const [results, setResults] = useState<Record<string, ExtractionResult>>({});
-  const [running, setRunning] = useState(false);
-  const [stage, setStage] = useState("");
+  const [launching, setLaunching] = useState(false);
+  const [progress, setProgress] = useState<Record<string, ExtractionProgress>>({});
   const [error, setError] = useState("");
   const abort = useRef<AbortController | null>(null);
+  const stopRequested = useRef(false);
   const resultArea = useRef<HTMLDivElement | null>(null);
   const ids = chosen ?? (["before", "after"] as const).flatMap((side) => {
     const doc = documents.find((d) => d.side === side && d.status === "parsed");
@@ -22,13 +25,19 @@ export function ExtractionPanel({ documents, loading }: { documents: StoredDocum
   const hasBoth = selected.some((d) => d.side === "before") && selected.some((d) => d.side === "after");
   const ready = hasBoth && selected.every((d) => d.status === "parsed");
   const complete = ready && selected.every((d) => results[d.id]);
+  const running = launching || selected.some(d => progress[d.id]?.status === "running");
   useEffect(() => {
     const controller = new AbortController();
-    for (const doc of documents.filter((d) => d.status === "parsed")) {
-      fetch(`/api/documents/${doc.id}/extract`, { signal: controller.signal })
-        .then(async (r) => r.ok ? r.json() : null)
-        .then((body) => { if (body && !controller.signal.aborted) setResults((old) => ({ ...old, [doc.id]: body.result })); })
-        .catch(() => {});
+    for (const doc of documents.filter(d => d.status === "parsed")) {
+      const update = (state: ExtractionProgress) => {
+        if (!controller.signal.aborted) setProgress(old=>({...old,[doc.id]:state}));
+      };
+      void extractionRequest(doc.id,"GET",controller.signal).then(async state=>{
+        update(state);
+        if(state.result) return state.result;
+        if(state.status==="running") return watchExtraction(doc.id,state,controller.signal,update);
+      }).then(result=>{if(result && !controller.signal.aborted) setResults(old=>({...old,[doc.id]:result}));})
+        .catch((e:unknown)=>{if(!controller.signal.aborted) update({status:"failed",completed_chunks:0,total_chunks:0,error:e instanceof Error && !["TypeError","TimeoutError"].includes(e.name) ? e.message : "Не удалось получить статус. Обновите страницу перед повторным запуском."});});
     }
     return () => controller.abort();
   }, [documents]);
@@ -36,25 +45,44 @@ export function ExtractionPanel({ documents, loading }: { documents: StoredDocum
 
   async function run() {
     if (!ready || running) return;
-    setChosen([...ids]); setRunning(true); setError("");
+    stopRequested.current=false;
+    setChosen([...ids]); setLaunching(true); setError("");
     const controller = new AbortController(); abort.current = controller;
-    try {
-      for (let i = 0; i < selected.length; i++) {
-        const doc = selected[i];
-        setStage(`Извлекаем подразделения и функции: ${i + 1} из ${selected.length} — ${doc.name}`);
-        const response = await fetch(`/api/documents/${doc.id}/extract`, {
-          method: "POST", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(310000)]),
-        });
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.error || "Извлечение не удалось.");
-        setResults((old) => ({ ...old, [doc.id]: body.result }));
+    const pending=selected.filter(d=>!results[d.id]);
+    let next=0;
+    const failures:string[]=[];
+    const worker=async()=>{
+      while(next<pending.length && !controller.signal.aborted && !stopRequested.current) {
+        const doc=pending[next++];
+        const update=(state:ExtractionProgress)=>{if(!controller.signal.aborted)setProgress(old=>({...old,[doc.id]:state}));};
+        update({status:"running",completed_chunks:0,total_chunks:0});
+        try {
+          const started=await extractionRequest(doc.id,"POST",controller.signal);
+          if(stopRequested.current && !started.result) await extractionRequest(doc.id,"DELETE",controller.signal);
+          const result=await watchExtraction(doc.id,started,controller.signal,update);
+          if(!controller.signal.aborted) setResults(old=>({...old,[doc.id]:result}));
+        } catch(e) {
+          if(controller.signal.aborted) return;
+          const message=e instanceof Error && !["TimeoutError","TypeError"].includes(e.name) ? e.message : "Связь с сервером прервалась. Обновите страницу: обработка может продолжаться.";
+          failures.push(`${doc.name}: ${message}`);
+          update({status:"failed",completed_chunks:0,total_chunks:0,error:message});
+        }
       }
-      setStage("Готово. Проверьте извлечённые функции и источники ниже.");
-      resultArea.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (e) {
-      setError(controller.signal.aborted ? "Обработка остановлена. Готовые результаты сохранены." : e instanceof Error && !["TimeoutError", "TypeError", "SyntaxError"].includes(e.name) ? e.message : "Сервер недоступен или не ответил вовремя. Обновите страницу перед повторным запуском.");
-      setStage("");
-    } finally { setRunning(false); abort.current = null; }
+    };
+    try {
+      await Promise.all(Array.from({length:Math.min(2,pending.length)},worker));
+      if(!controller.signal.aborted) {
+        setError(failures.join("\n"));
+        if(!failures.length) resultArea.current?.scrollIntoView({behavior:"smooth",block:"start"});
+      }
+    } finally {if(!controller.signal.aborted) setLaunching(false);abort.current=null;}
+  }
+  async function stop() {
+    // Explicit cancellation reaches the server; navigating away only stops polling.
+    stopRequested.current=true;
+    const active=selected.filter(d=>progress[d.id]?.status==="running");
+    const responses=await Promise.allSettled(active.map(d=>extractionRequest(d.id,"DELETE",AbortSignal.timeout(15000))));
+    if(responses.some(r=>r.status==="rejected")) setError("Не удалось подтвердить остановку. Обновите страницу для проверки статуса.");
   }
   function download() {
     const bundle = { schema_version: "extraction-bundle-v1", comparison_performed: false,
@@ -69,7 +97,11 @@ export function ExtractionPanel({ documents, loading }: { documents: StoredDocum
     {documents.length > 0 && <details className={styles.selection}><summary>Выбрано файлов: {selected.length}. Изменить выбор</summary><p>По умолчанию выбрана последняя обработанная загрузка каждой стороны. Исключите повторные копии.</p>{documents.map((d) => <label key={d.id}><input type="checkbox" checked={ids.includes(d.id)} disabled={running} onChange={(e) => setChosen(e.target.checked ? [...ids, d.id] : ids.filter((id) => id !== d.id))}/><span><b>{d.side === "before" ? "ДО" : "ПОСЛЕ"}</b> · {d.name} · {new Date(d.created_at).toLocaleTimeString("ru-RU")}{d.status !== "parsed" && " — текст недоступен"}</span></label>)}</details>}
     {!ready && !loading && <p className={styles.help}>Для запуска выберите хотя бы один обработанный DOCX, PDF или XLSX в каждом комплекте. Файлы с ошибкой чтения нужно исключить из выбора.</p>}
     <p className={styles.help}>При запуске текст выбранных документов отправляется в OpenAI. Обработка может занять несколько минут. Сохранённые результаты используются повторно.</p>
-    {running && <div className={styles.processing} role="status"><LoaderCircle size={18} className="spin"/><span>{stage}</span><button onClick={() => abort.current?.abort()}>Остановить</button></div>}
+    {running && <div className={styles.processing} role="status"><LoaderCircle size={18} className="spin"/><span>Обработка идёт на сервере. Страницу можно обновлять.</span><button onClick={() => void stop()}>Остановить</button></div>}
+    {selected.some(d=>progress[d.id] && progress[d.id].status!=="idle" && progress[d.id].status!=="complete") && <ul className={styles.jobProgress}>{selected.filter(d=>progress[d.id] && progress[d.id].status!=="idle").map(doc=>{
+      const state=progress[doc.id];
+      return <li key={doc.id}><b>{doc.side==="before" ? "ДО" : "ПОСЛЕ"}</b><span>{doc.name.replace(/_/g," ")}</span><small>{state.status==="complete" ? "Готово" : state.status==="running" ? state.total_chunks ? `Обработано частей: ${state.completed_chunks} из ${state.total_chunks}` : "Запуск…" : state.error || "Не завершено"}</small>{state.status==="running" && <progress aria-label={`Обработка ${doc.name}`} max={state.total_chunks || 1} value={state.total_chunks ? state.completed_chunks : undefined}/>}</li>;
+    })}</ul>}
     {error && <p className={styles.error} role="alert">{error}</p>}
     <div ref={resultArea} data-onboarding="results">
       {selected.some((d) => results[d.id]) && <>

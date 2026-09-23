@@ -3,6 +3,7 @@ import type { ExtractionResult, ExtractedFunction, ExtractedUnit } from "../extr
 import type { ParsedDocument } from "./document-parser";
 import { verifySource, type SourceFragment, type VerifiedSource } from "./document-sources";
 import { AiError, requestOpenAiJson, type JsonRequest } from "./openai-json";
+import { extractionPool } from "./extraction-pool";
 
 const str = { type: "string" };
 const optional = { type: ["string", "null"] };
@@ -111,15 +112,15 @@ export async function extractDocument(parsed: ParsedDocument, signal?: AbortSign
       const preceding = position ? chunks[position - 1].slice(-3) : [];
       const supplied = [...new Map([...context, ...preceding, ...target].map((f) => [f.fragment_id, f])).values()];
       const minimal = (f: SourceFragment) => ({ fragment_id: f.fragment_id, location: f.location, text: f.text });
-      const output = await provider({ instructions, input: JSON.stringify({ document: parsed.document,
+      const output = await extractionPool.run(combined, () => provider({ instructions, input: JSON.stringify({ document: parsed.document,
         context: supplied.filter((f) => !target.includes(f)).map(minimal), target: target.map(minimal) }),
-        schema: extractionSchema, schemaName: "organization_extraction", signal: combined });
+        schema: extractionSchema, schemaName: "organization_extraction", signal: combined }));
       combined.throwIfAborted();
       results[position] = validateExtraction(output, supplied);
       onProgress?.(++completed, chunks.length);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(2, chunks.length) }, worker))
+  await Promise.all(Array.from({ length: Math.min(extractionPool.capacity, chunks.length) }, worker))
     .catch((error: unknown) => { cancelBatch.abort(); throw error; });
   const units = new Map<string, ExtractedUnit>();
   const functions = new Map<string, ExtractedFunction>();

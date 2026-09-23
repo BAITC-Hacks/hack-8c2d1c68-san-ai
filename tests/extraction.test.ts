@@ -53,3 +53,39 @@ test("provider failure prevents partial success; successful extraction is explic
  assert.equal(result.functions.length,1);
  await assert.rejects(extractDocument(parsed,undefined,async()=>{throw new AiError("test refusal");}),AiError);
 });
+
+test("one document uses four available requests and retains all fragments", async () => {
+ const fragments=Array.from({length:8},(_,i)=>({...fragment,fragment_id:`p${i}`,text:"а".repeat(8000)}));
+ const releases:Array<()=>void>=[];
+ const seen:string[]=[];
+ const extraction=extractDocument({document_id:fragment.document_id,document:fragment.document,side:fragment.side,fragments,warnings:[]},undefined,async request=>{
+  const input=JSON.parse(request.input);
+  seen.push(...input.target.map((f:SourceFragment)=>f.fragment_id));
+  await new Promise<void>(resolve=>releases.push(resolve));
+  return {units:[],functions:[]};
+ });
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(seen.length,4);
+ releases.splice(0).forEach(release=>release());
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(seen.length,8);
+ releases.splice(0).forEach(release=>release());
+ const result=await extraction;
+ assert.equal(result.processed_fragments,8);
+ assert.deepEqual(seen,fragments.map(f=>f.fragment_id));
+});
+test("a fast chunk starts the next chunk without waiting for its slow peer; progress is real",async()=>{
+ const fragments=Array.from({length:3},(_,i)=>({...fragment,fragment_id:`part-${i}`,text:'x'.repeat(8000)}));
+ const parsed={document_id:fragment.document_id,document:fragment.document,side:fragment.side,fragments,warnings:[]};
+ let unblock!:()=>void;const slow=new Promise<void>(r=>{unblock=r;});
+ let active=0,max=0;const counts:number[]=[];const started:string[]=[];
+ const extraction=extractDocument(parsed,undefined,async request=>{
+  const id=JSON.parse(request.input).target[0].fragment_id;started.push(id);active++;max=Math.max(max,active);
+  if(id==='part-1')await slow;
+  if(id==='part-2')unblock();
+  active--;return {units:[],functions:[]};
+ },n=>counts.push(n));
+ const result=await extraction;
+ assert.equal(result.processed_fragments,3);assert.equal(max,2);
+ assert.deepEqual(started,['part-0','part-1','part-2']);assert.deepEqual(counts,[0,1,2,3]);
+});
