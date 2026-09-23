@@ -1,4 +1,5 @@
 import { documentError, DocumentError } from "@/lib/server/document-store";
+import { AiError } from "@/lib/server/openai-json";
 import { extractionJobs } from "@/lib/server/extraction-jobs";
 import { toCanonicalOrganization } from "@/lib/canonical-organization";
 export const runtime = "nodejs";
@@ -18,7 +19,7 @@ export async function GET(request: Request, context: Context) {
     if(!("result" in status)) throw new DocumentError(status.error || "AI-извлечение ещё не выполнено.",404);
     const payload=params.get("view")==="canonical" ? toCanonicalOrganization([status.result],status.result.side) : {result:status.result};
     return Response.json(payload,{headers:{"Cache-Control":"no-store",...(params.has("download") ? {"Content-Disposition":'attachment; filename="organization.json"'} : {})}});
-  } catch(error) {return documentError(error);}
+  } catch(error) {return documentError(error instanceof AiError ? new DocumentError(error.message,error.status) : error);}
 }
 export async function POST(request: Request, context: Context) {
   try {
@@ -41,9 +42,9 @@ export async function POST(request: Request, context: Context) {
     } finally {request.signal.removeEventListener("abort",cancel);}
     if(!started.job.result) throw new DocumentError(started.job.state.error || "Извлечение не выполнено.",started.job.errorStatus);
     return Response.json({result:started.job.result,cached:false});
-  } catch(error) {return documentError(error);}
+  } catch(error) {return documentError(error instanceof AiError ? new DocumentError(error.message,error.status) : error);}
 }
 export async function DELETE(request: Request, context: Context) {
   try {sameOrigin(request);const {id}=await context.params;return Response.json(await extractionJobs.cancel(id));}
-  catch(error) {return documentError(error);}
+  catch(error) {return documentError(error instanceof AiError ? new DocumentError(error.message,error.status) : error);}
 }

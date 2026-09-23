@@ -129,3 +129,8 @@
 .tourActions .tourNext { display:flex; align-items:center; gap:8px; background:#245c50; color:white; padding:10px 15px; }
 .tourCard button:focus-visible,.onboardingTrigger:focus-visible { outline:2px solid #49816c; outline-offset:2px; }
 @media(max-width:750px) { .headingActions { flex-direction:column; align-items:flex-end; gap:2px; } .onboardingTrigger { font-size:11px; } .tourCard { right:12px; bottom:12px; max-width:calc(100vw - 24px); padding:17px; } }
+.jobProgress { margin:12px 0; padding:0; list-style:none; }
+.jobProgress li { display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px 10px; border:1px solid #e3ebe6; padding:12px; border-radius:8px; margin-top:8px; font-size:12px; }
+.jobProgress li>b { color:#426f59; }
+.jobProgress li>span { overflow-wrap:anywhere; }
+.jobProgress small,.jobProgress progress { grid-column:2; color:#73857c; width:100%; accent-color:#245c50; }
