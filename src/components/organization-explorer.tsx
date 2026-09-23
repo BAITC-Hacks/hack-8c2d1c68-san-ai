@@ -1,6 +1,5 @@
 "use client";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft,
@@ -194,32 +193,7 @@ export function OrganizationExplorer() {
     ? (data?.nodes.filter((n) => n.parent_id === current.id) ?? [])
     : [];
   return (
-    <div className="app-shell">
-      <aside className="rail">
-        <div className="brand-mark" aria-label="San.ai">
-          s<span>.</span>
-        </div>
-        <div className="rail-divider" />
-        <div className="rail-item active" title="Организационная структура">
-          <Network size={22} />
-        </div>
-        <div className="rail-bottom">
-          <span className="avatar">SA</span>
-        </div>
-      </aside>
-      <div className="workspace">
-        <header className="topbar">
-          <div className="brand-name">
-            san<span>.ai</span>
-            <span className="brand-separator">/</span>
-            <span className="workspace-label">Рабочее пространство</span>
-          </div>
-          <Link href="/documents" className="primary-button">Документы ДО / ПОСЛЕ</Link>
-          <span className="demo-pill">
-            <FlaskConical size={13} /> Демо-среда
-          </span>
-        </header>
-        <main>
+    <main>
           <div className="page-heading">
             <div>
               <div className="eyebrow">ОРГАНИЗАЦИОННАЯ АНАЛИТИКА</div>
@@ -673,9 +647,7 @@ export function OrganizationExplorer() {
               demo
             </span>
           </footer>
-        </main>
-      </div>
-    </div>
+    </main>
   );
 }
 function MousePointerIcon() {

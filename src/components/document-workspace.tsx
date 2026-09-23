@@ -1,7 +1,6 @@
 "use client";
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { FileText, Upload, CheckCircle2, ArrowLeft, LoaderCircle, Download, RefreshCw } from "lucide-react";
+import { FileText, Upload, CheckCircle2, LoaderCircle, Download, RefreshCw } from "lucide-react";
 import { MAX_UPLOAD_BYTES, type DocumentSide, type StoredDocument } from "@/lib/documents";
 import styles from "./document-workspace.module.css";
 import { ExtractionPanel } from "./extraction-panel";
@@ -61,9 +60,7 @@ export function DocumentWorkspace() {
     if (saved) setNotice(`Сохранено файлов: ${saved}. Они доступны после перезапуска приложения.`);
     if (failures.length) setError(failures.join("\n"));
   }
-  return <div className={styles.page}>
-    <header className={styles.header}><Link href="/" className={styles.brand}>san<span>.ai</span></Link><Link href="/"><ArrowLeft size={15}/> Карта организации</Link></header>
-    <main className={styles.main}>
+  return <main className={styles.main}>
       <div className={styles.heading}><div><div className={styles.eyebrow}>ИСТОЧНИКИ АНАЛИЗА</div><h1>Документы до и после<span>.</span></h1><p>Соберите два комплекта для сравнения структуры и функций.</p></div><button className={styles.secondary} onClick={() => { setLoading(true); void refresh(); }} disabled={loading || !!busy}><RefreshCw size={16}/>Обновить</button></div>
       <ExtractionPanel documents={documents} loading={loading || !!busy}/>
       {error && <div className={styles.error} role="alert">{error}</div>}
@@ -86,6 +83,5 @@ export function DocumentWorkspace() {
         </section>;
       })}</div>
       <footer className={styles.footer}>Файлы прикреплены к общему рабочему пространству. Сохранение документов не означает завершение анализа.</footer>
-    </main>
-  </div>;
+  </main>;
 }

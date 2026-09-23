@@ -1,2 +1,5 @@
-import { DocumentWorkspace } from "@/components/document-workspace";
-export default function DocumentsPage() { return <DocumentWorkspace />; }
+import { redirect } from "next/navigation";
+
+export default function DocumentsPage() {
+  redirect("/");
+}

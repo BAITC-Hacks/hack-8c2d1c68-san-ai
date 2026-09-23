@@ -82,7 +82,9 @@ button:hover {
   place-items: center;
   border-radius: 10px;
 }
-.rail-item.active {
+.rail-item.active,
+a.rail-item:hover,
+a.rail-item:focus-visible {
   color: #276a57;
   background: #eaf1ed;
 }
@@ -1212,11 +1214,11 @@ main {
 }
 @media (max-width: 600px) {
   .rail {
-    display: none;
+    width: 52px;
   }
   .workspace {
-    margin-left: 0;
-    width: 100%;
+    margin-left: 52px;
+    width: calc(100% - 52px);
   }
   .topbar {
     height: 42px;
