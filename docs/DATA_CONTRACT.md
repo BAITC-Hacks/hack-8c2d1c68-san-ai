@@ -371,3 +371,11 @@ Full-stack 1 does not need to change extraction-v1. Old untyped extraction must
 be explicitly refreshed via `POST extract?refresh=1`. Updating extraction
 invalidates comparison lookup; input/current organizations are never mutated.
 Details: [COMPARISON.md](COMPARISON.md).
+
+### Comparison completion flags — 23.09.2026
+
+Additive fields: `analysis_complete: boolean` and `identical_sources: boolean`.
+Partial model responses retain only verified references and explicit review rows;
+absence findings are suppressed. Identical content bundles skip AI and do not
+perform a baseline risk audit; the conclusion explains this and completeness is
+false. Canonical entities and extraction-v1 are unchanged.
