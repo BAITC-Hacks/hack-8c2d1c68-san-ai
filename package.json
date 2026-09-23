@@ -8,6 +8,7 @@
   "scripts": {
     "ai:check": "tsx --env-file-if-exists=.env.local scripts/check-ai.ts",
     "ai:check-extraction": "tsx --env-file-if-exists=.env.local scripts/check-extraction.ts",
+    "ai:check-comparison": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/check-comparison.ts",
     "documents:parse": "tsx scripts/parse-docx.ts",
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",

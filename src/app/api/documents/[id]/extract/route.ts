@@ -42,7 +42,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { id } = await context.params;
     const document = await readDocument(id, true);
     const existing = await cached(id);
-    if (existing) return Response.json({ result: existing, cached: true });
+    const refresh = new URL(request.url).searchParams.get("refresh") === "1";
+    if (existing && !refresh) return Response.json({ result: existing, cached: true });
     if (locks.has(id)) throw new DocumentError("Этот документ уже обрабатывается. Повторите запрос позже.", 409);
     if (!process.env.OPENAI_API_KEY?.trim()) throw new AiError("На сервере не задан OPENAI_API_KEY.", 503);
     locks.add(id); acquired = id;

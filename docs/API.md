@@ -126,7 +126,8 @@
 `POST /api/documents/<id>/extract` запускает извлечение подразделений и функций,
 `GET` получает сохранённый результат, `?download=1` скачивает его.
 Подробности, ограничения и формат: [EXTRACTION.md](EXTRACTION.md).
-Это вход для будущего сравнения, не готовые findings.
+Это вход для сравнения, не готовые findings. `?refresh=1` для POST явно повторяет
+AI-извлечение; прежний результат заменяется только после успешного завершения.
 
 ### Canonical extraction
 
@@ -134,3 +135,11 @@
 `docs/DATA_CONTRACT.md`, обёртка `{ contract_version, review_required, warnings, organization }`.
 Не вызывает AI. `&download=1` скачивает JSON. Неизвестные владельцы — null;
 старый кэш без классификации сущностей возвращает предупреждения.
+
+### Comparison
+
+`POST /api/comparisons` принимает `{ before_ids: string[], after_ids: string[] }`
+с UUID загруженных документов и возвращает `{ result: ComparisonResult, cached }`.
+`GET /api/comparisons?before=<uuid>&after=<uuid>` читает сохранённое сравнение
+для текущих извлечений без AI; параметры можно повторять. `&download=1` скачивает JSON.
+Схема, лимиты, ошибки и кэш: [COMPARISON.md](COMPARISON.md).

@@ -41,3 +41,12 @@ This file records product-level changes to `PRODUCT_SPEC.md`.
 - Automatic personnel transfers or appointments.
 - Full scenario-management UI.
 - Production workflow / access-control implementation.
+
+## Implementation handoff — comparison, 2026-09-23
+
+- Implemented owner/function matching, five finding types, evidence, proposed
+  recommendations and analytical conclusion from canonical inputs.
+- Added comparison-v1 envelope to DATA_CONTRACT; extraction-v1 is compatible.
+- Missing/ambiguous data does not automatically imply loss.
+- Product scope and approval rules unchanged. Real-document semantic acceptance
+  remains pending; synthetic live verification is documented in COMPARISON.md.

@@ -20,7 +20,8 @@ export interface FunctionMatch {
   entity_type: "function";
   before_id: string;
   after_id: string | null;
-  similarity: number;
+  similarity: number | null;
+  confidence: number;
   status: "matched" | "not_found" | "needs_review";
   reason: string;
   evidence_refs: string[];
@@ -53,6 +54,7 @@ export interface ComparisonResult {
   created_at: string;
   model: string;
   review_required: true;
+  document_links: { document_id: string; side: "before" | "after"; storage_id: string }[];
   before: CanonicalOrganization;
   after: CanonicalOrganization;
   owner_groups: OwnerGroup[];

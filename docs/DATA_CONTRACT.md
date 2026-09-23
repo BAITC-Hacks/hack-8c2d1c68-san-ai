@@ -343,3 +343,31 @@ Agreed with Full-stack 1 in this session:
 
 Implementation: `src/lib/canonical-organization.ts`. Empty `positions`,
 `reporting_lines` or requirements do not prove absence in the original document.
+
+## 18. Comparison envelope — 2026-09-23
+
+Additive integration in `src/lib/comparison.ts`, schema `comparison-v1`:
+
+- `before`, `after`: unchanged canonical organizations, `current` and `proposed`.
+- `owner_groups`: unit/position identity correspondence, with `before_ids`,
+  `after_ids`, `confidence`, `reason`, `evidence_refs` and status
+  `preserved | transformed | created | unmatched | needs_review`.
+  Aliases refer to one owner, not a merger of different owners.
+  `created` is presented as potential, scoped to supplied data.
+- `matches`: shared Match shape. `after_id` can be null; one BEFORE can have
+  multiple rows. Status: `matched | not_found | needs_review`. Added `confidence`
+  measures certainty in the relation. `similarity` is nullable: the MVP uses
+  model confidence as an equivalence proxy only for equivalent matches, otherwise
+  null. It is not an embedding/cosine score.
+- `findings`, `recommendations`: existing shapes and five finding types.
+  Recommendations remain `proposed`, `target_changes: []`; no decisions are made.
+- `unmatched_after_ids`, `warnings`, `absence_assessable`, `review_required: true`,
+  `conclusion`, `comparison_id`, `model`, `created_at`: coverage/provenance.
+- `document_links`: `{ document_id, side, storage_id }` because parser content
+  IDs and upload UUIDs differ. Sources resolve through canonical `sources`.
+  The model cannot choose download URLs or source coordinates.
+
+Full-stack 1 does not need to change extraction-v1. Old untyped extraction must
+be explicitly refreshed via `POST extract?refresh=1`. Updating extraction
+invalidates comparison lookup; input/current organizations are never mutated.
+Details: [COMPARISON.md](COMPARISON.md).
