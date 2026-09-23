@@ -7,6 +7,11 @@
 
 This file is the current product source of truth. Historical snapshots in `docs/spec-history/` are for reference only and are not current implementation requirements.
 
+Frontend hackathon flow is specified by [UX_REDESIGN_SPEC.md](UX_REDESIGN_SPEC.md):
+Documents → Structures → Results (Changes / Recommendations). This is the current
+frontend scope; target approval and workforce features below remain future vision.
+Implementation and QA: [UX_REDESIGN_HANDOFF.md](UX_REDESIGN_HANDOFF.md).
+
 ## 1. Product vision
 
 SAN.AI is an AI Organization Design Copilot that helps a company:

@@ -1,7 +1,7 @@
 # UX_REDESIGN_SPEC
 
 **Version:** 0.1  
-**Status:** Ready for implementation  
+**Status:** Implemented locally; P0 frontend verified — see [handoff](UX_REDESIGN_HANDOFF.md)
 **Updated:** 2026-09-23  
 **Owner:** Product / Captain  
 **Scope:** frontend UX/UI, information architecture, navigation, presentation layer  

@@ -2,6 +2,19 @@
 
 This file records product-level changes to `PRODUCT_SPEC.md`.
 
+## Frontend P0 redesign — 2026-09-23
+
+- Актуальное frontend-ТЗ: `UX_REDESIGN_SPEC.md`; основной flow теперь
+  «Документы → Структуры → Результаты», рекомендации — вкладка результата.
+- Текущий комплект файлов виден сразу; добавление/исключение инвалидирует
+  зависимые представления. Возврат сохраняет состояние.
+- Синяя корпоративная тема, схемы ДО/ПОСЛЕ рядом, evidence по запросу,
+  отдельное оформление предложений AI, partial states без ложных нулей.
+- Tutorial открывается только вручную. Синтетический employee graph убран
+  из основной навигации и сохранён по прежнему адресу `/structure`.
+- Backend, comparison engine, DATA_CONTRACT и правила human-in-the-loop неизменны.
+- Проверки и оставшиеся ограничения: [UX_REDESIGN_HANDOFF.md](UX_REDESIGN_HANDOFF.md).
+
 ## v0.1 — 2026-09-23
 
 ### Added
