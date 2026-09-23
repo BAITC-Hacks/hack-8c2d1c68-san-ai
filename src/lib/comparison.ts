@@ -64,6 +64,8 @@ export interface ComparisonResult {
   unmatched_after_ids: string[];
   warnings: string[];
   absence_assessable: boolean;
+  analysis_complete: boolean;
+  identical_sources: boolean;
   conclusion: string;
 }
 

@@ -42,21 +42,32 @@ export function ExtractionPanel({ documents, loading }: { documents: StoredDocum
     if (!ready || running || comparing) return;
     setChosen([...ids]); setRunning(true); setError("");
     const controller = new AbortController(); abort.current = controller;
+    const active = new Set<string>();
     try {
-      for (let i = 0; i < selected.length; i++) {
-        const doc = selected[i];
-        setStage(`Извлекаем подразделения и функции: ${i + 1} из ${selected.length} — ${doc.name}`);
+      const pending = selected.filter(doc => refresh || !results[doc.id]);
+      let next = 0;
+      let completed = selected.length - pending.length;
+      const progress = new Map<string, string>();
+      const worker = async () => { while (next < pending.length) {
+        controller.signal.throwIfAborted();
+        const doc = pending[next++]; active.add(doc.id);
+        progress.set(doc.id, doc.name);
+        setStage(`Готово документов: ${completed} из ${selected.length}. ${[...progress.values()].join("; ")}`);
         const response = await fetch(`/api/documents/${doc.id}/extract${refresh ? "?refresh=1" : ""}`, {
           method: "POST", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(310000)]),
         });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Извлечение не удалось.");
         setResults((old) => ({ ...old, [doc.id]: body.result }));
-      }
+        active.delete(doc.id); progress.delete(doc.id); completed++;
+      } };
+      await Promise.all(Array.from({ length: Math.min(2, pending.length) }, worker));
       setStage("Готово. Проверьте извлечённые функции и источники ниже.");
       resultArea.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
+      for (const id of active) void fetch(`/api/documents/${id}/extract`, { method: "DELETE" }).catch(() => {});
       setError(controller.signal.aborted ? "Обработка остановлена. Готовые результаты сохранены." : e instanceof Error && !["TimeoutError", "TypeError", "SyntaxError"].includes(e.name) ? e.message : "Сервер недоступен или не ответил вовремя. Обновите страницу перед повторным запуском.");
+      controller.abort();
       setStage("");
     } finally { setRunning(false); abort.current = null; }
   }
@@ -69,8 +80,7 @@ export function ExtractionPanel({ documents, loading }: { documents: StoredDocum
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   return <section className={styles.analysis} aria-label="Подготовка к сравнению">
-    <div className={styles.steps}><span>1. Прикрепите документы</span><ArrowRight size={14}/><strong>2. Извлеките функции</strong><ArrowRight size={14}/><span>3. Сравните ДО и ПОСЛЕ</span><ArrowRight size={14}/><span>4. Проверьте выводы</span></div>
-    <div className={styles.actionHeading}><div><h2>{documents.length ? complete ? "Результаты готовы к просмотру" : "Документы готовы к обработке" : "Начните с документов ДО и ПОСЛЕ"}</h2><p>{complete ? "Откройте функции и проверьте их по исходным документам." : "Выберите документы ДО и ПОСЛЕ, затем извлеките функции."}</p></div><button className={styles.runButton} disabled={!ready || loading || running} onClick={() => complete ? resultArea.current?.scrollIntoView({ behavior: "smooth", block: "start" }) : void run()}>{running ? <LoaderCircle className="spin" size={17}/> : <ArrowRight size={17}/>} {running ? "Обработка…" : complete ? "Посмотреть результаты" : "Подготовить к сравнению"}</button></div>
+    <div className={styles.actionHeading} data-onboarding="process"><div><h2>{documents.length ? complete ? "Результаты готовы к просмотру" : "Документы готовы к обработке" : "Начните с документов ДО и ПОСЛЕ"}</h2><p>{complete ? "Откройте функции и проверьте их по исходным документам." : "Выберите документы ДО и ПОСЛЕ, затем извлеките функции."}</p></div><button className={styles.runButton} disabled={!ready || loading || running} onClick={() => complete ? resultArea.current?.scrollIntoView({ behavior: "smooth", block: "start" }) : void run()}>{running ? <LoaderCircle className="spin" size={17}/> : <ArrowRight size={17}/>} {running ? "Обработка…" : complete ? "Посмотреть результаты" : "Подготовить к сравнению"}</button></div>
     {documents.length > 0 && <details className={styles.selection}><summary>Выбрано файлов: {selected.length}. Изменить выбор</summary><p>По умолчанию выбрана последняя обработанная загрузка каждой стороны. Исключите повторные копии.</p>{documents.map((d) => <label key={d.id}><input type="checkbox" checked={ids.includes(d.id)} disabled={running || comparing} onChange={(e) => setChosen(e.target.checked ? [...ids, d.id] : ids.filter((id) => id !== d.id))}/><span><b>{d.side === "before" ? "ДО" : "ПОСЛЕ"}</b> · {d.name} · {new Date(d.created_at).toLocaleTimeString("ru-RU")}{d.status !== "parsed" && " — текст недоступен"}</span></label>)}</details>}
     {!ready && !loading && <p className={styles.help}>Для запуска выберите хотя бы один обработанный DOCX, PDF или XLSX в каждом комплекте. Файлы с ошибкой чтения нужно исключить из выбора.</p>}
     <p className={styles.help}>При запуске текст выбранных документов отправляется в OpenAI. Обработка может занять несколько минут. Сохранённые результаты используются повторно.</p>
@@ -78,7 +88,7 @@ export function ExtractionPanel({ documents, loading }: { documents: StoredDocum
     {error && <p className={styles.error} role="alert">{error}</p>}
     {complete && <div className={styles.resultHeader}><p className={styles.help}>{legacy ? "В старом извлечении не различаются подразделения и должности. Обновите его перед сравнением." : "Если извлечение неполное, его можно выполнить заново. Это повторно отправит выбранные документы в OpenAI."}</p><button className={styles.secondary} disabled={running || comparing} onClick={() => void run(true)}>Обновить извлечение</button></div>}
     {complete && !running && !legacy && <ComparisonPanel key={comparisonKey} beforeIds={selected.filter(d => d.side === "before").map(d => d.id)} afterIds={selected.filter(d => d.side === "after").map(d => d.id)} onBusy={busy => { if (busy) setChosen([...ids]); setComparing(busy); }}/>}
-    <div ref={resultArea}>
+    <div ref={resultArea} data-onboarding="results">
       {selected.some((d) => results[d.id]) && <>
         <div className={styles.resultHeader}><h3><CheckCircle2 size={18}/> Результаты обработки</h3>{complete && <button className={styles.secondary} onClick={download}>Скачать результаты</button>}</div>
         <p className={styles.help}>Извлечённые факты служат входом для сравнения выше. Проверьте назначение функций, ограничения и полноту данных.</p>

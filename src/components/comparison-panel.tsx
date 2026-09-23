@@ -56,7 +56,7 @@ export function ComparisonPanel({ beforeIds, afterIds, onBusy }: { beforeIds: st
     setError(""); setRunning(true); onBusy(true);
     const controller = new AbortController(); abort.current = controller;
     try {
-      const response = await fetch("/api/comparisons", { method: "POST", headers: { "Content-Type": "application/json" },
+      const response = await fetch(`/api/comparisons${result ? "?refresh=1" : ""}`, { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ before_ids: beforeIds, after_ids: afterIds }), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(610000)]) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Сравнение не удалось.");
@@ -70,13 +70,16 @@ export function ComparisonPanel({ beforeIds, afterIds, onBusy }: { beforeIds: st
     <div className={styles.heading}><div><span className={styles.eyebrow}>ШАГ 3 · СРАВНЕНИЕ</span><h2>{result ? "Что изменилось в организации" : "Сопоставьте структуру и функции"}</h2><p>{result ? "Изменения и потенциальные риски с обоснованием из выбранных документов." : "Найдите сохранённые и переданные функции, возможные потери, дублирование и конфликты."}</p></div>
       {!result && <button className={styles.primary} disabled={running || loading} onClick={() => void run()}>{running || loading ? <LoaderCircle size={17} className="spin"/> : <ArrowRight size={17}/>} {loading ? "Проверяем результат…" : running ? "Сравниваем…" : "Сравнить ДО и ПОСЛЕ"}</button>}
       {result && <a className={styles.download} href={`/api/comparisons?${query}&download=1`}><Download size={16}/>Скачать сравнение</a>}
+      {result && !result.analysis_complete && !result.identical_sources && <button className={styles.primary} disabled={running} onClick={() => void run()}>Повторить неполный анализ</button>}
     </div>
     {!result && <p className={styles.muted}>Извлечённые факты и цитаты выбранных документов будут отправлены в OpenAI. Сравнение может занять несколько минут.</p>}
     {running && <div className={styles.processing} role="status"><LoaderCircle size={18} className="spin"/><span>Сопоставляем владельцев и функции, затем проверяем риски. Дождитесь завершения всех этапов.</span><button onClick={() => abort.current?.abort()}>Остановить</button></div>}
     {error && <p className={styles.error} role="alert">{error}</p>}
     {result && <>
+      {result.identical_sources && <div className={styles.notice}><strong>ДО и ПОСЛЕ — одинаковые файлы</strong><p>{result.conclusion}</p></div>}
+      {!result.analysis_complete && !result.identical_sources && <div className={styles.notice}><strong>Анализ частичный — есть строки для проверки</strong><p>Проверенные соответствия сохранены. Некорректные ссылки модели не использованы для выводов; возможные потери не оценивались.</p></div>}
       <div className={styles.notice}><strong>Требует проверки ответственным сотрудником</strong><p>ПОСЛЕ — предложенное состояние. Выводы и рекомендации не изменяют текущую организацию. Уверенность — оценка модели, не вероятность.</p></div>
-      <div className={styles.stats}>{types.map(type => <button key={type} aria-pressed={filter === type && tab === "findings"} onClick={() => { setFilter(filter === type ? "all" : type); setTab("findings"); }}><span>{findingLabels[type]}</span><strong>{type === "lost" && !result.absence_assessable ? "—" : result.findings.filter(f => f.type === type).length}</strong>{type === "lost" && !result.absence_assessable && <small>Недостаточно данных</small>}</button>)}</div>
+      <div className={styles.stats}>{types.map(type => <button key={type} aria-pressed={filter === type && tab === "findings"} onClick={() => { setFilter(filter === type ? "all" : type); setTab("findings"); }}><span>{findingLabels[type]}</span><strong>{(type === "lost" && !result.absence_assessable || result.identical_sources && type !== "preserved") ? "—" : result.findings.filter(f => f.type === type).length}</strong>{type === "lost" && !result.absence_assessable && <small>Недостаточно данных</small>}</button>)}</div>
       <details className={styles.warnings}><summary>Ограничения и полнота данных · {result.warnings.length}</summary><ul>{result.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul></details>
       <nav className={styles.tabs} aria-label="Разделы сравнения">{([["findings", "Выводы и риски"], ["functions", "Таблица функций"], ["units", "Подразделения и должности"]] as const).map(([value, label]) => <button key={value} aria-pressed={tab === value} onClick={() => setTab(value)}>{label}</button>)}</nav>
       {tab === "findings" && <>

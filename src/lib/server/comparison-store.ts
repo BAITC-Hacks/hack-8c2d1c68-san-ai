@@ -52,7 +52,7 @@ async function loadInputs(selection: ComparisonSelection, root: string) {
   return { before, after, links };
 }
 
-export async function storedComparison(selectionValue: unknown, options: { generate: boolean; signal?: AbortSignal; root?: string; model?: string; provider?: (request: JsonRequest) => Promise<unknown> }) {
+export async function storedComparison(selectionValue: unknown, options: { generate: boolean; refresh?: boolean; signal?: AbortSignal; root?: string; model?: string; provider?: (request: JsonRequest) => Promise<unknown> }) {
   const selection = validateSelection(selectionValue);
   const root = options.root ?? storageRoot();
   const inputs = await loadInputs(selection, root);
@@ -64,7 +64,7 @@ export async function storedComparison(selectionValue: unknown, options: { gener
   try {
     const result = JSON.parse(await readFile(filename, "utf8")) as ComparisonResult;
     if (result.schema_version !== "comparison-v1" || result.comparison_id !== id) throw new Error("Invalid comparison cache");
-    return { result: { ...result, document_links: inputs.links }, cached: true };
+    if (!options.refresh) return { result: { ...result, document_links: inputs.links }, cached: true };
   } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   if (!options.generate) throw new DocumentError("Для этого комплекта сравнение ещё не выполнено.", 404);
   const lockId = `${root}:${id}`;

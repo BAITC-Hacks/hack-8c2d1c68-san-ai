@@ -58,10 +58,10 @@ test("partial and low confidence matches cannot become loss or transfer", async 
   assert.ok(!result.findings.some(f => ["lost", "transferred", "preserved"].includes(f.type)));
 });
 
-test("invented IDs, missing coverage, wrong entity kind and invalid confidence fail the entire comparison", async () => {
+test("bad or missing model references become explicit review rows without fabricated findings", async () => {
   const { before, after } = pair();
   for (const failure of ["id", "missing", "kind", "confidence"]) {
-    await assert.rejects(compareOrganizations([before], [after], undefined, async request => {
+    const result = await compareOrganizations([before], [after], undefined, async request => {
       const value = await fixtureProvider(request) as { groups: { entity_type: string }[]; matches: { after_ids: string[]; confidence: number }[] };
       if (failure === "kind" && request.schemaName === "comparison_owners") value.groups[0].entity_type = "position";
       if (request.schemaName === "comparison_matches") {
@@ -70,20 +70,46 @@ test("invented IDs, missing coverage, wrong entity kind and invalid confidence f
         if (failure === "confidence") value.matches[0].confidence = 5;
       }
       return value;
-    }), AiError);
+    });
+    assert.equal(result.analysis_complete, false);
+    assert.equal(result.absence_assessable, false);
+    assert.ok(!result.findings.some(f => f.type === "lost"));
+    assert.equal(new Set(result.matches.map(m => m.before_id)).size, before.functions.length);
+    assert.ok(result.warnings.some(w => /частич|Неполное/.test(w)));
+    assert.ok(!result.matches.some(m => m.after_id === "invented-function"));
   }
 });
 
 test("prohibition versus duty can never be an equivalent assignment", async () => {
   const { before, after } = pair();
   const prohibition = before.functions.find(f => f.modality === "prohibition")!;
-  const duty = after.functions.find(f => f.object === "платежи" && f.modality === "duty")!;
   const result = await compareOrganizations([before], [after], undefined, async request => {
     const value = await fixtureProvider(request) as { matches: { before_id: string; after_ids: string[] }[] };
-    if (request.schemaName === "comparison_matches") value.matches.find(m => m.before_id === prohibition.function_id)!.after_ids = [duty.function_id];
+    if (request.schemaName === "comparison_matches") {
+      const input = JSON.parse(request.input);
+      const b = input.target_before.find((f: { modality: string }) => f.modality === "prohibition");
+      const a = input.all_after.find((f: { object: string; modality: string }) => f.object === "платежи" && f.modality === "duty");
+      value.matches.find(m => m.before_id === b.id)!.after_ids = [a.id];
+    }
     return value;
   });
   assert.equal(result.matches.find(m => m.before_id === prohibition.function_id)?.status, "needs_review");
+});
+
+test("identical documents bypass AI even when independent extractions disagree", async () => {
+  const { before } = pair();
+  const after = structuredClone(before);
+  after.side = "after";
+  after.units.forEach(u => { u.unit_id = `after-${u.unit_id}`; u.evidence.forEach(s => { s.side = "after"; }); });
+  after.functions.forEach(f => { f.function_id = `after-${f.function_id}`; f.evidence.forEach(s => { s.side = "after"; }); });
+  after.functions.pop(); // Stochastic extraction differs, source content does not.
+  const result = await compareOrganizations([before], [after], undefined, async () => { throw new Error("AI must not be called for identical sources"); });
+  assert.equal(result.identical_sources, true);
+  assert.equal(result.analysis_complete, false); // Intra-state risk audit was intentionally not run.
+  assert.match(result.conclusion, /побайтно/);
+  assert.ok(result.findings.every(f => f.type === "preserved"));
+  assert.equal(result.recommendations.length, 0);
+  assert.ok(result.matches.some(m => m.status === "needs_review"));
 });
 
 test("management vertical is not duplicate ownership; same responsibility duties are not a conflict", async () => {

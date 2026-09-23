@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     } finally { clearTimeout(timer); reader.releaseLock(); }
     let input: unknown;
     try { input = JSON.parse(Buffer.concat(chunks).toString()); } catch { throw new DocumentError("Некорректный запрос сравнения."); }
-    return Response.json(await storedComparison(input, { generate: true, signal: request.signal }), { headers: { "Cache-Control": "no-store" } });
+    return Response.json(await storedComparison(input, { generate: true, refresh: new URL(request.url).searchParams.get("refresh") === "1", signal: request.signal }), { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return comparisonError(error); }
 }
 

@@ -92,28 +92,35 @@ export function chunkFragments(fragments: SourceFragment[], limit = 14000): Sour
 }
 
 type Provider = (request: JsonRequest) => Promise<unknown>;
-export async function extractDocument(parsed: ParsedDocument, signal?: AbortSignal, provider: Provider = requestOpenAiJson): Promise<ExtractionResult> {
+export async function extractDocument(parsed: ParsedDocument, signal?: AbortSignal, provider: Provider = requestOpenAiJson, onProgress?: (completed: number, total: number) => void): Promise<ExtractionResult> {
   const chunks = chunkFragments(parsed.fragments);
   const overall = AbortSignal.timeout(300000);
   const cancelBatch = new AbortController();
   const combined = AbortSignal.any([overall, cancelBatch.signal, ...(signal ? [signal] : [])]);
-  const results: ReturnType<typeof validateExtraction>[] = [];
+  const results: ReturnType<typeof validateExtraction>[] = new Array(chunks.length);
   const context = [...parsed.fragments.slice(0, 12), ...parsed.fragments.filter((f) => f.text.length < 400 && /департамент|подразделени|блок|управлени|отдел/i.test(f.text)).slice(0, 15)];
-  // Two bounded requests at a time; all chunks must finish before a result is saved.
-  for (let i = 0; i < chunks.length; i += 2) {
-    combined.throwIfAborted();
-    const batch = await Promise.all(chunks.slice(i, i + 2).map(async (target, offset) => {
-      const position = i + offset;
+  let next = 0;
+  let completed = 0;
+  onProgress?.(0, chunks.length);
+  // Each worker takes the next chunk immediately; no waiting for a slower batch peer.
+  const worker = async () => {
+    while (next < chunks.length) {
+      combined.throwIfAborted();
+      const position = next++;
+      const target = chunks[position];
       const preceding = position ? chunks[position - 1].slice(-3) : [];
       const supplied = [...new Map([...context, ...preceding, ...target].map((f) => [f.fragment_id, f])).values()];
       const minimal = (f: SourceFragment) => ({ fragment_id: f.fragment_id, location: f.location, text: f.text });
       const output = await provider({ instructions, input: JSON.stringify({ document: parsed.document,
         context: supplied.filter((f) => !target.includes(f)).map(minimal), target: target.map(minimal) }),
         schema: extractionSchema, schemaName: "organization_extraction", signal: combined });
-      return validateExtraction(output, supplied);
-    })).catch((error: unknown) => { cancelBatch.abort(); throw error; });
-    results.push(...batch);
-  }
+      combined.throwIfAborted();
+      results[position] = validateExtraction(output, supplied);
+      onProgress?.(++completed, chunks.length);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(3, chunks.length) }, worker))
+    .catch((error: unknown) => { cancelBatch.abort(); throw error; });
   const units = new Map<string, ExtractedUnit>();
   const functions = new Map<string, ExtractedFunction>();
   for (const result of results) {
