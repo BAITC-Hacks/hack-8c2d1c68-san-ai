@@ -5,7 +5,7 @@ import type { ExtractionResult } from "@/lib/extraction";
 import { DocumentStructure } from "./document-structure";
 import styles from "./document-workspace.module.css";
 
-export function DocumentExtractionResult({ document: doc, result }: { document: StoredDocument; result: ExtractionResult }) {
+export function DocumentExtractionResult({ document: doc, result, functionsOnly = false }: { document: StoredDocument; result: ExtractionResult; functionsOnly?: boolean }) {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [page, setPage] = useState(0);
@@ -22,8 +22,8 @@ export function DocumentExtractionResult({ document: doc, result }: { document: 
       <span>{result.functions.length} функций и ограничений · открыть результат</span>
     </summary>
     <div className={styles.resultBody}>
-      {result.rejected_items > 0 && <p className={styles.reviewNote}>Часть данных не подтверждена источниками и не включена в результат. Подробнее — в разделе «Об обработке».</p>}
-      <DocumentStructure result={result}/>
+      {result.rejected_items > 0 && <p className={styles.reviewNote}>Часть данных не подтверждена источниками и не включена в результат. Подробнее — в разделе «Техническая информация».</p>}
+      {!functionsOnly && <DocumentStructure result={result}/>}
       <h4 className={styles.functionHeading}>Функции и ответственность</h4>
       <div className={styles.resultFilters}>
         <label>Поиск по функции или исполнителю<input type="search" value={query} placeholder="Например, аудит или контроль" onChange={e=>{setQuery(e.target.value);setPage(0);}}/></label>
@@ -37,7 +37,7 @@ export function DocumentExtractionResult({ document: doc, result }: { document: 
         {f.evidence.map((source,i)=><blockquote key={i}>{source.quote}<cite>{source.document.replace(/_/g," ")} · {source.location.format === "docx" ? `абзац ${source.location.paragraph}` : source.location.format === "pdf" ? `стр. ${source.location.page}` : `лист ${source.location.sheet}, ${source.location.cells}`}{"section" in source.location && source.location.section ? ` · пункт ${source.location.section}` : ""}</cite></blockquote>)}
       </details>)}
       {filtered.length > 10 && <nav className={styles.pagination} aria-label={`Страницы функций ${doc.name}`}><button disabled={currentPage === 0} onClick={()=>setPage(currentPage-1)}>Назад</button><span>Страница {currentPage+1} из {lastPage+1}</span><button disabled={currentPage === lastPage} onClick={()=>setPage(currentPage+1)}>Далее</button></nav>}
-      <details className={styles.technical}><summary>Об обработке</summary><p>Модель: {result.model} · обработано фрагментов: {result.processed_fragments} · не включено записей: {result.rejected_items}</p>{result.warnings.map((w,i)=><p key={i}>{w}</p>)}<div className={styles.links}><a href={`/api/documents/${doc.id}`}>Исходный документ</a><a href={`/api/documents/${doc.id}/extract?download=1`}>Данные JSON</a></div></details>
+      <details className={styles.technical}><summary>Техническая информация</summary><p>Модель: {result.model} · обработано фрагментов: {result.processed_fragments} · не включено записей: {result.rejected_items}</p>{result.warnings.map((w,i)=><p key={i}>{w}</p>)}<div className={styles.links}><a href={`/api/documents/${doc.id}`}>Исходный документ</a><a href={`/api/documents/${doc.id}/extract?download=1`}>Данные JSON</a></div></details>
     </div>
   </details>;
 }

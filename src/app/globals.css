@@ -1,9 +1,27 @@
+/* Shared SAN.AI design tokens. Legacy graph styles below remain isolated to /structure. */
 :root {
-  --ink: #233b41;
-  --muted: #849398;
-  --line: #e6ebed;
-  --accent: #245c50;
-  --bg: #f5f7f8;
+  --brand-primary: #0869cf;
+  --brand-primary-hover: #0757ad;
+  --brand-primary-soft: #eef6ff;
+  --brand-primary-border: #bad5f3;
+  --text-primary: #172e48;
+  --text-secondary: #5c6d81;
+  --surface: #ffffff;
+  --surface-secondary: #f5f8fc;
+  --border: #dfe6ef;
+  --success: #25744a;
+  --warning: #805b12;
+  --warning-soft: #fff8e9;
+  --warning-border: #eddaad;
+  --danger: #a03932;
+  --danger-soft: #fff1ef;
+  --danger-border: #f1ceca;
+  --shadow: #102b4c18;
+  --ink: var(--text-primary);
+  --muted: var(--text-secondary);
+  --line: var(--border);
+  --accent: var(--brand-primary);
+  --bg: var(--surface);
 }
 * {
   box-sizing: border-box;
@@ -1348,3 +1366,17 @@ main {
     padding-bottom: 5px;
   }
 }
+
+/* Three-step document workspace shell. */
+.workspace { margin-left:0; width:100%; }
+.topbar { height:68px; padding:0 40px; gap:22px; border-bottom:1px solid var(--border); }
+.brand-name { font-size:23px; letter-spacing:-.8px; color:var(--text-primary); text-decoration:none; flex-shrink:0; }
+.brand-name>span:first-child { color:var(--brand-primary); font-weight:700; }
+.workspace-label { margin-right:auto; color:var(--text-secondary); font-size:12px; }
+.case-label { color:var(--text-secondary); font-size:11px; }
+.back-to-analysis { color:var(--brand-primary); font-size:12px; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline:2px solid var(--brand-primary); outline-offset:3px; }
+summary { cursor:pointer; }
+button:disabled { cursor:not-allowed; }
+@media(max-width:700px) { .topbar { padding:0 16px; height:60px; gap:12px; } .workspace-label { display:none; } .case-label { margin-left:auto; font-size:10px; } }
+@media(prefers-reduced-motion:reduce) { *, *::before, *::after { scroll-behavior:auto !important; animation-duration:.01ms !important; animation-iteration-count:1 !important; } }

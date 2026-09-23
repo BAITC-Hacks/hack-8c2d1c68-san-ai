@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 export const metadata: Metadata = {
-  title: "San.ai — Анализ организации",
+  title: "SAN.AI — Анализ организационных изменений",
   description:
-    "Демонстрационный стенд анализа организационной структуры. 20 000 синтетических сотрудников.",
+    "Сравнение документов до и после реорганизации: структуры, изменения функций, источники и рекомендации.",
 };
 export default function RootLayout({
   children,
