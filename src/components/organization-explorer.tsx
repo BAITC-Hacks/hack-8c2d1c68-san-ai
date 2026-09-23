@@ -221,58 +221,11 @@ export function OrganizationExplorer() {
           <div className="page-heading">
             <div>
               <div className="eyebrow">ОРГАНИЗАЦИОННАЯ АНАЛИТИКА</div>
-              <h1>
-                Вся структура. Одна картина<span>.</span>
-              </h1>
               <p>
                 Исследуйте подразделения, команды и связи между сотрудниками.
               </p>
             </div>
-            <div className="dataset-tag">
-              <span className="status-dot" /> DEMO DATASET{" "}
-              <span className="dataset-version">v1.0</span>
-            </div>
           </div>
-          <section className="stats" aria-label="Статистика организации">
-            {[
-              {
-                label: "Сотрудников",
-                value: organization?.stats.employees,
-                icon: Users,
-                detail: "Синтетические записи",
-              },
-              {
-                label: "Департаментов",
-                value: organization?.stats.departments,
-                icon: Building2,
-                detail: "Функциональные направления",
-              },
-              {
-                label: "Отделов",
-                value: organization?.stats.teams,
-                icon: GitBranch,
-                detail: "По 10 в каждом департаменте",
-              },
-              {
-                label: "Узлов на экране",
-                value: loading ? undefined : data?.meta.nodeCount,
-                icon: Network,
-                detail:
-                  rootId === "company" ? "Первый уровень" : "Текущая ветка",
-              },
-            ].map(({ label, value, icon: Icon, detail }) => (
-              <div className="stat" key={label}>
-                <div className="stat-top">
-                  {label}
-                  <Icon size={17} />
-                </div>
-                <div className="stat-value">
-                  {value === undefined ? "—" : format(value)}
-                </div>
-                <div className="stat-detail">{detail}</div>
-              </div>
-            ))}
-          </section>
           <section className="explorer" aria-label="Обозреватель структуры">
             <div className="explorer-toolbar">
               <div className="explorer-title">

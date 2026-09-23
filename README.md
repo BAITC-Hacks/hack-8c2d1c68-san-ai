@@ -1,5 +1,46 @@
 # San.ai · Org Explorer
 
+## Демо в NVIDIA Brev
+
+Приложение развёрнуто 23 сентября 2026: <https://3000-ynr8e39a4.gobrev.dev/>.
+Ссылка требует входа в разрешённый аккаунт NVIDIA/Brev. Управление сервером:
+[san-ai-demo](https://brev.nvidia.com/org/org-3Jihe1id1uwGdOcFAR6lRvKNhaP/environments/ynr8e39a4#Access).
+
+GCP, 2 vCPU, 8 GiB RAM, диск 100 GiB; показанная при запуске стоимость
+$0.09/час, после Stop — около $0.02/час за диск. GPU не используется.
+На сервере Node.js 22.23.2, приложение в `/home/ubuntu/workspace/san-ai`,
+PGlite в `.data/pglite`, один процесс под systemd `san-ai.service`.
+Перенесены исходники приложения и синтетические данные; локальные `.env`,
+Git-конфигурация и пользовательские документы не переносились.
+
+Проверены на сервере `npm ci`, `npm run build`, `npm run db:seed`,
+health-check, статистика и поиск. Локально перед деплоем прошли 25 тестов.
+
+Команды на сервере:
+
+```bash
+sudo systemctl status san-ai --no-pager
+sudo journalctl -u san-ai -n 100 --no-pager
+curl --fail http://127.0.0.1:3000/api/health
+```
+
+SSH через созданный Brev-туннель (на компьютере с выполненным `brev login`):
+
+```bash
+ssh -i ~/.brev/brev.pem -p 39798 ubuntu@global.prd.ga.run.brev.nvidia.com
+```
+
+Порт туннеля сверяйте в Access после изменений инфраструктуры. Деплой выполнен
+копированием снимка рабочих файлов, автоматическая доставка новых изменений
+из Git не настроена. Перед обновлением, сборкой или seed остановите сервис
+через `sudo systemctl stop san-ai`; после — `sudo systemctl start san-ai`.
+Для npm на сервере добавьте Node.js в PATH:
+
+```bash
+export PATH="$HOME/.local/share/san-ai/node-v22.23.2-linux-x64/bin:$PATH"
+cd /home/ubuntu/workspace/san-ai
+```
+
 Next.js-приложение с фронтендом и HTTP API для исследования организационной структуры. Sigma.js рисует граф через WebGL, Graphology хранит граф на клиенте. Интерфейс на русском языке.
 
 **Это начальный стенд с моковыми данными, не реализация AI-анализа ТЗ.** В базе ровно 20 000 синтетических сотрудников, 20 департаментов, 200 отделов и один корневой узел: всего 20 221 узел и 20 220 связей. Имена, должности, города, структура и подчинение вымышлены и не отражают штат Казахтелекома. Документы пользователя не загружаются в БД и не отправляются внешним сервисам.
