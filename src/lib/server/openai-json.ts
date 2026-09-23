@@ -8,6 +8,8 @@ export interface JsonRequest {
   schema: Record<string, unknown>;
   schemaName: string;
   signal?: AbortSignal;
+  model?: string;
+  reasoningEffort?: "low";
 }
 export interface AiConfig {
   apiKey?: string;
@@ -26,7 +28,8 @@ export async function requestOpenAiJson(request: JsonRequest, config: AiConfig =
       method: "POST", signal,
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: config.model ?? process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+        model: config.model ?? request.model ?? process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+        ...(request.reasoningEffort ? { reasoning: { effort: request.reasoningEffort } } : {}),
         store: false,
         instructions: request.instructions,
         input: request.input,

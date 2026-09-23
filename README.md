@@ -255,7 +255,8 @@ cp .env.example .env.local
 
 ```dotenv
 OPENAI_API_KEY=your_key_here
-OPENAI_MODEL=gpt-4.1-mini
+OPENAI_EXTRACTION_MODEL=gpt-4.1-mini
+OPENAI_COMPARISON_MODEL=gpt-6-sol
 ```
 
 **Не публикуйте API-ключ в GitHub.**
@@ -473,3 +474,17 @@ DATABASE_URL=postgresql://...
 **SAN.AI**
 
 HackAlem AI, 2026
+
+### Раздельные модели AI
+
+Извлечение: `OPENAI_EXTRACTION_MODEL`, затем прежний `OPENAI_MODEL`, затем
+`gpt-4.1-mini`. Сравнение: `OPENAI_COMPARISON_MODEL`, по умолчанию `gpt-6-sol`.
+Для GPT-6 Sol/Astra/Luna сравнение отправляет `reasoning.effort: low`; для
+`gpt-4.1-mini` reasoning не передаётся. Возврат сравнения к прежней модели:
+`OPENAI_COMPARISON_MODEL=gpt-4.1-mini`. После изменения окружения перезапустите сервер.
+Таймаут одного запроса остаётся 90 секунд, всего сравнения — 10 минут.
+Кэш сравнения учитывает модель и версию алгоритма. Кэш извлечения сохраняется:
+смена модели не запускает повторную обработку документов автоматически.
+На Brev окружение хранится в `/home/ubuntu/workspace/san-ai/.env.local`;
+релизы используют ссылку на этот файл. Сначала доставьте обновлённый код.
+Перезапуск существующего сервиса: `sudo systemctl restart san-ai`.

@@ -144,3 +144,20 @@ test("identical source content on both sides is allowed; same-side copies are re
   after.functions[0].scope = "Изменённая область";
   assert.notEqual(id, comparisonId([before], [after], "one"));
 });
+
+test("comparison model matches provider requests, result provenance and cache key", async () => {
+ const { before, after } = pair();
+ for (const model of ["gpt-6-sol", "gpt-4.1-mini"]) {
+  let calls = 0;
+  const result = await compareOrganizations([before], [after], undefined, async request => {
+   calls++;
+   assert.equal(request.model, model);
+   assert.equal(request.reasoningEffort, model === "gpt-6-sol" ? "low" : undefined);
+   return fixtureProvider(request);
+  }, model);
+  assert.ok(calls > 0);
+  assert.equal(result.model, model);
+  assert.equal(result.comparison_id, comparisonId([before], [after], model));
+ }
+ assert.notEqual(comparisonId([before], [after], "gpt-6-sol"), comparisonId([before], [after], "gpt-4.1-mini"));
+});

@@ -17,6 +17,7 @@ async function main() {
       await writeFile(path.join(root, document.id, "extraction-v1.json"), JSON.stringify(fixture.extraction));
       input[`${side}_ids`].push(document.id);
     }
+    const started = Date.now();
     const { result } = await storedComparison(input, { root, generate: true });
     const types = [...new Set(result.findings.map(f => f.type))].sort();
     if (types.length !== 5) console.error(JSON.stringify({ synthetic: true, absence_assessable: result.absence_assessable, review: result.matches.filter(m => m.status !== "matched") }));
@@ -26,7 +27,7 @@ async function main() {
     assert.equal(result.owner_groups.find(g => g.before_ids.includes(result.before.units[0].unit_id))?.status, "transformed");
     assert.equal((await storedComparison(input, { root, generate: false })).cached, true);
     assert.equal((await storedComparison(input, { root, generate: true })).cached, true);
-    console.log(JSON.stringify({ synthetic: true, live_model: true, types, findings: result.findings.length, recommendations: result.recommendations.length, cache: true, evidence: "verified against parsed documents", current: result.before.state, after: result.after.state }));
+    console.log(JSON.stringify({ synthetic: true, live_model: true, model: result.model, elapsed_ms: Date.now() - started, types, findings: result.findings.length, recommendations: result.recommendations.length, cache: true, evidence: "verified against parsed documents", current: result.before.state, after: result.after.state }));
   } finally { await rm(root, { recursive: true, force: true }); }
 }
 main().catch((error: unknown) => { console.error(error instanceof Error ? error.message : "Synthetic comparison check failed"); process.exitCode = 1; });

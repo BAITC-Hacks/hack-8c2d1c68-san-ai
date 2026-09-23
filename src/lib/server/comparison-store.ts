@@ -1,3 +1,4 @@
+import { comparisonModel } from "./ai-models";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -57,7 +58,7 @@ export async function storedComparison(selectionValue: unknown, options: { gener
   const root = options.root ?? storageRoot();
   const inputs = await loadInputs(selection, root);
   prepareComparison(inputs.before, inputs.after);
-  const model = options.model ?? process.env.OPENAI_MODEL ?? "gpt-4.1-mini";
+  const model = options.model ?? comparisonModel();
   const id = comparisonId(inputs.before, inputs.after, model);
   const directory = path.join(root, ".comparisons");
   const filename = path.join(directory, `${id}.json`);

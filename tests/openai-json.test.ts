@@ -9,6 +9,7 @@ test("server sends strict schema, model, no storage and reads Responses output",
   const body = JSON.parse(init.body as string);
   assert.equal(body.store, false); assert.equal(body.text.format.strict, true);
   assert.equal(body.model, "test-model");
+  assert.equal(body.reasoning, undefined);
   assert.equal(body.input, request.input);
   return Response.json({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: '{"ok":true}' }] }] });
  }) as typeof fetch;
@@ -34,4 +35,14 @@ test("slow provider is aborted with a bounded timeout", async () => {
  })) as typeof fetch;
  await assert.rejects(requestOpenAiJson(request, { apiKey: "synthetic-key", timeoutMs: 10, fetcher }),
   (e: unknown) => e instanceof AiError && e.status === 504);
+});
+
+test("workload request forwards its model and low reasoning to Responses", async () => {
+ const fetcher = (async (_url: string, init: RequestInit) => {
+  const body = JSON.parse(init.body as string);
+  assert.equal(body.model, "gpt-6-sol");
+  assert.deepEqual(body.reasoning, { effort: "low" });
+  return Response.json({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: '{}' }] }] });
+ }) as typeof fetch;
+ await requestOpenAiJson({ ...request, model: "gpt-6-sol", reasoningEffort: "low" }, { apiKey: "synthetic-key", fetcher });
 });

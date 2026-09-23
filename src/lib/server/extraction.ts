@@ -1,3 +1,4 @@
+import { extractionModel } from "./ai-models";
 import { createHash } from "node:crypto";
 import type { ExtractionResult, ExtractedFunction, ExtractedUnit } from "../extraction";
 import type { ParsedDocument } from "./document-parser";
@@ -94,6 +95,7 @@ export function chunkFragments(fragments: SourceFragment[], limit = 14000): Sour
 
 type Provider = (request: JsonRequest) => Promise<unknown>;
 export async function extractDocument(parsed: ParsedDocument, signal?: AbortSignal, provider: Provider = requestOpenAiJson, onProgress?: (completed: number, total: number) => void): Promise<ExtractionResult> {
+  const model = extractionModel();
   const chunks = chunkFragments(parsed.fragments);
   const overall = AbortSignal.timeout(300000);
   const cancelBatch = new AbortController();
@@ -112,7 +114,7 @@ export async function extractDocument(parsed: ParsedDocument, signal?: AbortSign
       const preceding = position ? chunks[position - 1].slice(-3) : [];
       const supplied = [...new Map([...context, ...preceding, ...target].map((f) => [f.fragment_id, f])).values()];
       const minimal = (f: SourceFragment) => ({ fragment_id: f.fragment_id, location: f.location, text: f.text });
-      const output = await extractionPool.run(combined, () => provider({ instructions, input: JSON.stringify({ document: parsed.document,
+      const output = await extractionPool.run(combined, () => provider({ model, instructions, input: JSON.stringify({ document: parsed.document,
         context: supplied.filter((f) => !target.includes(f)).map(minimal), target: target.map(minimal) }),
         schema: extractionSchema, schemaName: "organization_extraction", signal: combined }));
       combined.throwIfAborted();
@@ -134,7 +136,7 @@ export async function extractDocument(parsed: ParsedDocument, signal?: AbortSign
   }
   const rejected = results.reduce((sum, result) => sum + result.rejected, 0);
   return { schema_version: "extraction-v1", document_id: parsed.document_id, document: parsed.document, side: parsed.side,
-    model: process.env.OPENAI_MODEL || "gpt-4.1-mini", created_at: new Date().toISOString(), review_required: true,
+    model, created_at: new Date().toISOString(), review_required: true,
     processed_fragments: parsed.fragments.length, rejected_items: rejected,
     warnings: [...parsed.warnings, "AI-извлечение требует проверки. Наличие цитат не доказывает правильность трактовки или полноту извлечения.",
       ...(rejected ? [`Отклонено сущностей без корректной структуры или подтверждающей цитаты: ${rejected}.`] : [])],

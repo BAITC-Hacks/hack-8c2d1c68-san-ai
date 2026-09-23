@@ -1,10 +1,11 @@
+import { comparisonModel, comparisonReasoning } from "./ai-models";
 import { createHash } from "node:crypto";
 import { toCanonicalOrganization, type CanonicalOrganization } from "../canonical-organization";
 import { normalizeOwnerName, type ComparisonResult, type Finding, type FunctionMatch, type OwnerGroup, type Recommendation } from "../comparison";
 import type { ExtractionResult } from "../extraction";
 import { AiError, requestOpenAiJson, type JsonRequest } from "./openai-json";
 
-const VERSION = "comparison-v1.1-fast";
+const VERSION = "comparison-v1.2-model-routing";
 const THRESHOLD = 0.8; // Review threshold, not a calibrated probability.
 const BATCH_SIZE = 48;
 const RISK_BATCH_SIZE = 96;
@@ -282,7 +283,7 @@ function makeResult(prepared: ReturnType<typeof prepareComparison>, groups: Owne
     ...prepared, warnings, owner_groups: groups, matches, findings, recommendations, unmatched_after_ids, conclusion };
 }
 
-export async function compareOrganizations(beforeDocs: ExtractionResult[], afterDocs: ExtractionResult[], signal?: AbortSignal, provider: Provider = requestOpenAiJson, model = process.env.OPENAI_MODEL || "gpt-4.1-mini"): Promise<ComparisonResult> {
+export async function compareOrganizations(beforeDocs: ExtractionResult[], afterDocs: ExtractionResult[], signal?: AbortSignal, provider: Provider = requestOpenAiJson, model = comparisonModel()): Promise<ComparisonResult> {
   signal?.throwIfAborted();
   const prepared = prepareComparison(beforeDocs, afterDocs);
   const { before, after } = prepared;
@@ -327,7 +328,7 @@ export async function compareOrganizations(beforeDocs: ExtractionResult[], after
     combined.throwIfAborted();
     const serialized = JSON.stringify(input, (_key, value) => typeof value === "string" ? aliases.get(value) ?? value : value);
     if (serialized.length > 500000) throw new AiError("Комплект слишком большой для одного этапа сравнения. Уменьшите выбор документов.", 422);
-    const result = await provider({ instructions: `${baseInstructions}\nОбъяснение каждой строки — одно короткое предложение.\n${instructions}`, input: serialized, schema, schemaName, signal: combined });
+    const result = await provider({ model, reasoningEffort: comparisonReasoning(model), instructions: `${baseInstructions}\nОбъяснение каждой строки — одно короткое предложение.\n${instructions}`, input: serialized, schema, schemaName, signal: combined });
     combined.throwIfAborted();
     return JSON.parse(JSON.stringify(result), (_key, value) => typeof value === "string" ? originals.get(value) ?? value : value) as unknown;
   };
