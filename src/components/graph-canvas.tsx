@@ -123,7 +123,10 @@ export default function GraphCanvas({
             }
           : {}),
         labelRenderedSizeThreshold: 5,
-        hideEdgesOnMove: true,
+        // Sigma 3.0.3 queues a mouseup refresh for this option that can run
+        // after kill() when navigating branches. Each branch is small enough
+        // to keep its edges visible while panning.
+        hideEdgesOnMove: false,
         zIndex: true,
         minCameraRatio: 0.008,
         maxCameraRatio: 3,
