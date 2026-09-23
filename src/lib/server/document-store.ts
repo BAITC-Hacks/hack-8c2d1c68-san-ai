@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MAX_UPLOAD_BYTES, type StoredDocument } from "../documents";
-import { parseDocx, DocxParseError } from "./docx-parser";
+import { parseDocument, DocumentParseError } from "./document-parser";
 
 export class DocumentError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -34,18 +34,18 @@ export async function saveDocument(data: Uint8Array, name: string, side: string,
     status: "stored", fragment_count: 0, warnings: [],
   };
   let parsed;
-  if (format === "docx") {
+  {
     try {
-      parsed = parseDocx(data, name, side);
+      parsed = await parseDocument(data, name, side);
       metadata.status = "parsed";
       metadata.fragment_count = parsed.fragments.length;
       metadata.warnings = parsed.warnings;
     } catch (error) {
-      if (!(error instanceof DocxParseError)) throw error;
+      if (!(error instanceof DocumentParseError)) throw error;
       metadata.status = "parse_error";
       metadata.warnings = [error.message];
     }
-  } else metadata.warnings = ["Файл сохранён. Извлечение текста из этого формата пока не подключено."];
+  }
   await mkdir(root, { recursive: true });
   const temporary = path.join(root, `.pending-${metadata.id}`);
   await mkdir(temporary);

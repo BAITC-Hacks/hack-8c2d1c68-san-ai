@@ -27,11 +27,11 @@ test("stores originals, metadata and parsed text across independent reads; same 
  } finally { await rm(root, { recursive:true, force:true }); }
 });
 
-test("PDF is honestly stored without extraction; invalid DOCX retains original with parse error", async () => {
+test("invalid PDF and DOCX retain originals with parse errors", async () => {
  const root = await mkdtemp(path.join(tmpdir(), "san-files-"));
  try {
   const pdf = await saveDocument(strToU8("%PDF-1.7\nsynthetic"), "test.pdf", "before", root);
-  assert.equal(pdf.status, "stored");
+  assert.equal(pdf.status, "parse_error");
   await assert.rejects(readDocument(pdf.id, true, root), DocumentError);
   const invalid = await saveDocument(zipSync({ "other": strToU8("test") }), "test.docx", "after", root);
   assert.equal(invalid.status, "parse_error");

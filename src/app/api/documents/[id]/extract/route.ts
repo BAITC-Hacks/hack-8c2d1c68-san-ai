@@ -4,7 +4,7 @@ import path from "node:path";
 import { readDocument, storageRoot, documentError, DocumentError } from "@/lib/server/document-store";
 import { extractDocument } from "@/lib/server/extraction";
 import { AiError } from "@/lib/server/openai-json";
-import type { ParsedDocx } from "@/lib/server/docx-parser";
+import type { ParsedDocument } from "@/lib/server/document-parser";
 import type { ExtractionResult } from "@/lib/extraction";
 import { toCanonicalOrganization } from "@/lib/canonical-organization";
 export const runtime = "nodejs";
@@ -46,7 +46,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (locks.has(id)) throw new DocumentError("Этот документ уже обрабатывается. Повторите запрос позже.", 409);
     if (!process.env.OPENAI_API_KEY?.trim()) throw new AiError("На сервере не задан OPENAI_API_KEY.", 503);
     locks.add(id); acquired = id;
-    const result = await extractDocument(JSON.parse(document.data.toString()) as ParsedDocx, request.signal);
+    const result = await extractDocument(JSON.parse(document.data.toString()) as ParsedDocument, request.signal);
     const temporary = `${cacheFile(id)}.${randomUUID()}.tmp`;
     try {
       await writeFile(temporary, JSON.stringify(result));
