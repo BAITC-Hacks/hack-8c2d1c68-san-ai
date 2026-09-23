@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ExtractionResult, ExtractedFunction, ExtractedUnit } from "../extraction";
-import type { ParsedDocx } from "./docx-parser";
+import type { ParsedDocument } from "./document-parser";
 import { verifySource, type SourceFragment, type VerifiedSource } from "./document-sources";
 import { AiError, requestOpenAiJson, type JsonRequest } from "./openai-json";
 
@@ -82,7 +82,7 @@ export function chunkFragments(fragments: SourceFragment[], limit = 14000): Sour
   let current: SourceFragment[] = [];
   let size = 0;
   for (const fragment of fragments) {
-    if (fragment.text.length > limit) throw new AiError("Один абзац слишком большой для извлечения. Разделите документ.", 422);
+    if (fragment.text.length > limit) throw new AiError("Один фрагмент слишком большой для извлечения. Разделите документ.", 422);
     if (size + fragment.text.length > limit && current.length) { chunks.push(current); current = []; size = 0; }
     current.push(fragment); size += fragment.text.length;
   }
@@ -92,7 +92,7 @@ export function chunkFragments(fragments: SourceFragment[], limit = 14000): Sour
 }
 
 type Provider = (request: JsonRequest) => Promise<unknown>;
-export async function extractDocument(parsed: ParsedDocx, signal?: AbortSignal, provider: Provider = requestOpenAiJson): Promise<ExtractionResult> {
+export async function extractDocument(parsed: ParsedDocument, signal?: AbortSignal, provider: Provider = requestOpenAiJson): Promise<ExtractionResult> {
   const chunks = chunkFragments(parsed.fragments);
   const overall = AbortSignal.timeout(300000);
   const cancelBatch = new AbortController();
@@ -106,7 +106,7 @@ export async function extractDocument(parsed: ParsedDocx, signal?: AbortSignal, 
       const position = i + offset;
       const preceding = position ? chunks[position - 1].slice(-3) : [];
       const supplied = [...new Map([...context, ...preceding, ...target].map((f) => [f.fragment_id, f])).values()];
-      const minimal = (f: SourceFragment) => ({ fragment_id: f.fragment_id, text: f.text });
+      const minimal = (f: SourceFragment) => ({ fragment_id: f.fragment_id, location: f.location, text: f.text });
       const output = await provider({ instructions, input: JSON.stringify({ document: parsed.document,
         context: supplied.filter((f) => !target.includes(f)).map(minimal), target: target.map(minimal) }),
         schema: extractionSchema, schemaName: "organization_extraction", signal: combined });

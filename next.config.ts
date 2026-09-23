@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
-  serverExternalPackages: ["@electric-sql/pglite", "pg"],
+  serverExternalPackages: ["@electric-sql/pglite", "pg", "unpdf"],
   poweredByHeader: false,
   agentRules: false,
 };

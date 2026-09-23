@@ -16,7 +16,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
-    "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts"
+    "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
+    "documents:check": "tsx scripts/check-document-formats.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
@@ -28,7 +29,8 @@
     "pg": "^8.23.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "sigma": "^3.0.3"
+    "sigma": "^3.0.3",
+    "unpdf": "^1.8.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
