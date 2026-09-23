@@ -1,5 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft,
@@ -213,6 +214,7 @@ export function OrganizationExplorer() {
             <span className="brand-separator">/</span>
             <span className="workspace-label">Рабочее пространство</span>
           </div>
+          <Link href="/documents" className="primary-button">Документы ДО / ПОСЛЕ</Link>
           <span className="demo-pill">
             <FlaskConical size={13} /> Демо-среда
           </span>

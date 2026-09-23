@@ -28,6 +28,7 @@ The hackathon implementation may support DOCX first.
 
 ```json
 {
+  "source_id": "before:doc-...:paragraph-127:0:42",
   "document_id": "doc-...",
   "document_name": "Положение_редакция_8.docx",
   "side": "before",
@@ -104,6 +105,9 @@ approved
   "canonical_text": "Проводить аудит информационных систем",
   "original_text": "аудит ИТ систем ...",
   "responsibility_type": "execution",
+  "modality": "duty",
+  "conditions": null,
+  "scope": null,
   "source_refs": ["src-003"]
 }
 ```
@@ -315,3 +319,27 @@ Workforce modules are downstream:
 `Approved Target Organization + Employee Profiles -> Role Alignment -> Transition Plan`
 
 No downstream module may silently mutate the canonical current organization.
+
+## 17. Extraction clarification — 2026-09-23
+
+Agreed with Full-stack 1 in this session:
+
+- `source_refs` resolves to `sources[].source_id`. IDs must distinguish document,
+  side, fragment and quoted span. Sources retain full `text`, exact `quote`,
+  `start`/`end` (UTF-16 offsets), and parser-owned location. Unknown page/section
+  may be omitted or null; never fabricate DOCX page numbers.
+- Function `modality`: `duty`, `permission`, `prohibition`. Preserve `conditions`
+  and `scope` as string or null; a prohibition must not become an executable duty.
+- Unknown/ambiguous function ownership: `owner_id: null`, `owner_type: null`.
+  Known `owner_type`: `unit` or `position`. Unresolved ownership is not evidence
+  of a lost function. Unresolved parent/unit/reporting links may be null.
+- Raw unclassified mentions must not automatically become organizational units.
+- Canonical extraction may be wrapped with `contract_version`,
+  `review_required: true` and `warnings`; the model lives in `organization`.
+  Consumers must check warnings and completeness before interpreting absence.
+- Import of BEFORE maps to `current`, AFTER to `proposed`; import does not
+  approve a proposal or overwrite another organization. Extraction still
+  requires review, including BEFORE.
+
+Implementation: `src/lib/canonical-organization.ts`. Empty `positions`,
+`reporting_lines` or requirements do not prove absence in the original document.
