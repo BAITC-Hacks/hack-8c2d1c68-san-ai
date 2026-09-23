@@ -30,15 +30,35 @@ SSH через созданный Brev-туннель (на компьютере
 ssh -i ~/.brev/brev.pem -p 39798 ubuntu@global.prd.ga.run.brev.nvidia.com
 ```
 
-Порт туннеля сверяйте в Access после изменений инфраструктуры. Деплой выполнен
-копированием снимка рабочих файлов, автоматическая доставка новых изменений
-из Git не настроена. Перед обновлением, сборкой или seed остановите сервис
-через `sudo systemctl stop san-ai`; после — `sudo systemctl start san-ai`.
-Для npm на сервере добавьте Node.js в PATH:
+## CI/CD
+
+Workflow `.github/workflows/ci-cd.yml` запускает `npm ci`, lint, 25 тестов
+и production build для pull request и push в `main`. После успешных проверок
+push в `main` автоматически обновляет Brev. Ручной повтор: GitHub → Actions →
+CI and Brev deploy → Run workflow (ветка `main`). Одновременные деплои сериализованы.
+
+[Запуски GitHub Actions](https://github.com/BAITC-Hacks/hack-8c2d1c68-san-ai/actions).
+Используются repository secrets `BREV_DEPLOY_KEY` и `BREV_KNOWN_HOSTS`.
+Отдельный ключ допускает только команду `/usr/local/bin/san-ai-deploy`,
+без интерактивного SSH и перенаправления портов. Личный ключ Brev не передаётся в CI.
+
+Серверный скрипт: `scripts/deploy/brev-release.sh`. Версия собирается в
+`/home/ubuntu/workspace/san-ai-releases`, пока предыдущая работает.
+Затем systemd переключается через `san-ai-current`; простой — только на перезапуск.
+При неуспешном health-check скрипт возвращает предыдущую версию.
+База остаётся в `/home/ubuntu/workspace/san-ai/.data/pglite`, серверный
+`.env.local` также остаётся вне релизов. Seed и миграции автоматически не запускаются:
+изменения схемы БД требуют отдельного согласованного обновления и резервной копии.
+Старые релизы сохраняются для восстановления; следите за свободным диском.
+
+После изменений SSH-туннеля обновите адрес/порт в workflow и `BREV_KNOWN_HOSTS`.
+При изменении серверного скрипта его необходимо установить на сервер отдельно:
 
 ```bash
-export PATH="$HOME/.local/share/san-ai/node-v22.23.2-linux-x64/bin:$PATH"
-cd /home/ubuntu/workspace/san-ai
+# После копирования нового скрипта на сервер в /tmp/brev-release.sh:
+sudo install -o root -g root -m 755 /tmp/brev-release.sh /usr/local/bin/san-ai-deploy
+# Проверка развёрнутого коммита:
+cat /home/ubuntu/workspace/san-ai-current/.release-commit
 ```
 
 Next.js-приложение с фронтендом и HTTP API для исследования организационной структуры. Sigma.js рисует граф через WebGL, Graphology хранит граф на клиенте. Интерфейс на русском языке.

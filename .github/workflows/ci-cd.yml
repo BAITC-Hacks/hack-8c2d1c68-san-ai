@@ -1,0 +1,46 @@
+name: CI and Brev deploy
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Deploy main to Brev
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          DEPLOY_KEY: ${{ secrets.BREV_DEPLOY_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.BREV_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/san_ai_deploy"
+          chmod 600 "$HOME/.ssh/san_ai_deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          trap 'rm -f "$HOME/.ssh/san_ai_deploy"' EXIT
+          git archive --format=tar.gz HEAD > "$RUNNER_TEMP/release.tar.gz"
+          ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+            -i "$HOME/.ssh/san_ai_deploy" -p 39798 \
+            ubuntu@global.prd.ga.run.brev.nvidia.com "$GITHUB_SHA" \
+            < "$RUNNER_TEMP/release.tar.gz"
