@@ -37,7 +37,11 @@ test("seed contains exactly 20,000 employees, 20 departments and 200 teams", asy
     nodes: 20221,
   });
   assert.equal(info.departments.length, 20);
-  assert.ok(info.departments.every((d) => d.employees === 1000));
+  assert.ok(
+    info.departments.every(
+      (d) => d.employees === (d.id === "dep-01" ? 999 : 1000),
+    ),
+  );
 });
 test("repeated migration and seed preserve existing rows without duplicates", async () => {
   await db.query("UPDATE org_nodes SET role=$1 WHERE id=$2", [
@@ -77,8 +81,8 @@ test("overview omits employees; department graph includes its ancestors", async 
   assert.equal(overview.nodes.length, 221);
   assert.ok(overview.nodes.every((n) => n.kind !== "employee"));
   const scoped = await graphData(db, "employees", "dep-01");
-  assert.equal(scoped.nodes.length, 1012);
-  assert.equal(scoped.edges.length, 1011);
+  assert.equal(scoped.nodes.length, 1011);
+  assert.equal(scoped.edges.length, 1010);
   assert.ok(
     scoped.nodes.every(
       (n) => n.id === "company" || n.department_id === "dep-01",
@@ -113,4 +117,107 @@ test("API validates modes and scope; database error does not leak internals", as
   const response = apiError(new Error("sensitive connection string"));
   assert.equal(response.status, 503);
   assert.ok(!(await response.text()).includes("sensitive"));
+});
+
+test("branch overview shows only direct departments and company employees", async () => {
+  const { branchData } = await import("../src/lib/server/branch");
+  const branch = await branchData(db, "company", 0);
+  assert.equal(branch.meta.layout, "radial");
+  assert.equal(branch.nodes.length, 22);
+  assert.equal(branch.nodes.filter((n) => n.kind === "employee").length, 1);
+  assert.equal(
+    branch.nodes.find((n) => n.id === "emp-00002")?.role,
+    "Генеральный директор",
+  );
+  assert.ok(
+    branch.nodes.every((n) => n.id === "company" || n.parent_id === "company"),
+  );
+  const root = branch.nodes.find((n) => n.id === "company")!;
+  for (const node of branch.nodes.filter((n) => n.id !== "company")) {
+    assert.ok(
+      Math.abs(Math.hypot(node.x - root.x, node.y - root.y) - 400) < 0.001,
+    );
+  }
+});
+test("each deeper branch is top-down and includes employees irrespective of kind", async () => {
+  const { branchData } = await import("../src/lib/server/branch");
+  for (const id of ["dep-01", "dep-01-team-1", "emp-00001"]) {
+    const branch = await branchData(db, id, 0);
+    const root = branch.nodes.find((n) => n.id === id)!;
+    assert.equal(branch.meta.layout, "tree");
+    assert.ok(branch.nodes.length <= 13);
+    assert.equal(branch.edges.length, branch.nodes.length - 1);
+    assert.ok(
+      branch.nodes
+        .filter((n) => n.id !== id)
+        .every((n) => n.parent_id === id && n.y < root.y),
+    );
+    assert.equal(branch.breadcrumbs[0].id, "company");
+    assert.equal(branch.breadcrumbs.at(-1)?.id, id);
+  }
+  const department = await branchData(db, "dep-01", 0);
+  assert.equal(department.nodes.length, 12);
+  assert.equal(
+    department.nodes.find((n) => n.id === "emp-00003")?.role,
+    "Директор департамента",
+  );
+});
+test("all direct reports are reachable through pages, without duplicates or hidden descendants", async () => {
+  const { branchData } = await import("../src/lib/server/branch");
+  const first = await branchData(db, "emp-00001", 0);
+  assert.equal(first.meta.totalChildren, 97);
+  const ids: string[] = [];
+  for (
+    let page = 0;
+    page < Math.ceil(first.meta.totalChildren / first.meta.pageSize);
+    page++
+  ) {
+    const branch = await branchData(db, "emp-00001", page);
+    ids.push(
+      ...branch.nodes.filter((n) => n.id !== "emp-00001").map((n) => n.id),
+    );
+  }
+  assert.equal(ids.length, 97);
+  assert.equal(new Set(ids).size, 97);
+  await assert.rejects(() => branchData(db, "emp-00001", 99));
+});
+test("leaf navigation preserves the complete path; invalid roots are rejected", async () => {
+  const { branchData, branchParams } = await import("../src/lib/server/branch");
+  const leaf = await branchData(db, "emp-00004", 0);
+  assert.equal(leaf.nodes.length, 1);
+  assert.equal(leaf.meta.totalChildren, 0);
+  assert.deepEqual(
+    leaf.breadcrumbs.map((n) => n.id),
+    ["company", "dep-01", "dep-01-team-1", "emp-00001", "emp-00004"],
+  );
+  await assert.rejects(() => branchData(db, "missing-node", 0));
+  for (const query of ["root=' OR 1=1", "page=-1", "page=abc", "page=1.5"])
+    assert.throws(() => branchParams(new URLSearchParams(query)));
+});
+test("director migration upgrades original demo records but preserves edited roles", async () => {
+  await db.query(
+    "UPDATE org_nodes SET parent_id='emp-00001',department_id='dep-01',role='Аналитик' WHERE id='emp-00002'",
+  );
+  await db.query(
+    "UPDATE org_nodes SET parent_id='emp-00001',role='Специалист' WHERE id='emp-00003'",
+  );
+  await db.query(
+    "UPDATE org_nodes SET parent_id='emp-01001',role='Аналитик' WHERE id='emp-01002'",
+  );
+  await migrate(db);
+  const chief = (await searchNodes(db, "emp-00002", null))[0];
+  assert.equal(chief.parent_id, "company");
+  assert.equal(chief.department_id, null);
+  assert.equal(
+    (await searchNodes(db, "emp-00003", null))[0].parent_id,
+    "dep-01",
+  );
+  assert.equal(
+    (await searchNodes(db, "emp-01002", null))[0].parent_id,
+    "dep-02",
+  );
+  assert.equal(
+    (await searchNodes(db, "emp-20000", null))[0].role,
+    "Изменённая тестовая роль",
+  );
 });

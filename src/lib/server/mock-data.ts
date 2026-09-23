@@ -92,5 +92,18 @@ export function generateMockNodes(): OrgNode[] {
       }
     }
   });
+  // Reassign existing synthetic employees; keep the dataset at exactly 20,000.
+  const chief = nodes.find((n) => n.id === "emp-00002")!;
+  chief.parent_id = "company";
+  chief.department_id = null;
+  chief.role = "Генеральный директор";
+  departments.forEach((_, d) => {
+    const director = nodes.find(
+      (n) =>
+        n.id === `emp-${String(d * 1000 + (d === 0 ? 3 : 2)).padStart(5, "0")}`,
+    )!;
+    director.parent_id = director.department_id;
+    director.role = "Директор департамента";
+  });
   return nodes;
 }

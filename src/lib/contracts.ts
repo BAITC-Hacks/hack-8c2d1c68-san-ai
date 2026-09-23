@@ -32,3 +32,22 @@ export const kindLabels: Record<NodeKind, string> = {
   team: "Отдел",
   employee: "Сотрудник",
 };
+
+export interface BranchNode extends OrgNode {
+  child_count: number;
+}
+export interface BranchData {
+  nodes: BranchNode[];
+  edges: GraphData["edges"];
+  breadcrumbs: OrgNode[];
+  meta: {
+    mock: true;
+    rootId: string;
+    layout: "radial" | "tree";
+    nodeCount: number;
+    edgeCount: number;
+    totalChildren: number;
+    page: number;
+    pageSize: number;
+  };
+}

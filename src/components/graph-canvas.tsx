@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Graph from "graphology";
 import Sigma from "sigma";
 import { Minus, Plus, Maximize, MousePointer2 } from "lucide-react";
-import type { GraphData, OrgNode } from "@/lib/contracts";
+import type { BranchData, OrgNode } from "@/lib/contracts";
 const colors = ["#5676db", "#669a85", "#a68bd0", "#cf9870", "#719fbe"];
 export function nodeColor(node: OrgNode) {
   return node.kind === "company"
@@ -16,7 +16,7 @@ export default function GraphCanvas({
   onSelect,
   showEdges,
 }: {
-  data: GraphData;
+  data: BranchData;
   selected: string | null;
   onSelect: (node: OrgNode | null) => void;
   showEdges: boolean;
@@ -36,23 +36,31 @@ export default function GraphCanvas({
       graph.addNode(n.id, {
         x: n.x,
         y: n.y,
-        label: n.label,
+        label:
+          n.kind === "team"
+            ? n.label.split(" · ")[0]
+            : data.meta.layout === "radial" && n.kind === "employee"
+              ? n.role
+              : n.label,
+        subLabel:
+          n.kind === "employee"
+            ? n.role
+            : n.child_count > 0
+              ? `${n.child_count} вложенных объектов`
+              : "",
+        forceLabel:
+          n.id === data.meta.rootId ||
+          (data.meta.layout === "radial" && n.kind === "employee"),
+
         color: nodeColor(n),
-        size:
-          n.kind === "company"
-            ? 10
-            : n.kind === "department"
-              ? 7
-              : n.kind === "team"
-                ? 3.5
-                : 1.5,
+        size: n.id === data.meta.rootId ? 11 : n.kind === "employee" ? 6 : 8,
         kind: n.kind,
         zIndex: n.kind === "employee" ? 0 : 1,
       }),
     );
     data.edges.forEach((e) =>
       graph.addEdgeWithKey(e.id, e.source, e.target, {
-        size: 0.4,
+        size: 1,
         color: "#cbd4d8",
       }),
     );
@@ -63,7 +71,57 @@ export default function GraphCanvas({
         labelFont: "Arial",
         labelSize: 12,
         labelColor: { color: "#3d5058" },
-        labelDensity: 0.12,
+        labelDensity: 0.4,
+        ...(data.meta.layout === "tree"
+          ? {
+              defaultDrawNodeLabel: (
+                context: CanvasRenderingContext2D,
+                node: {
+                  x: number;
+                  y: number;
+                  size: number;
+                  label?: string | null;
+                  subLabel?: string;
+                },
+              ) => {
+                const text = node.label ?? "";
+                const words = text.split(" ");
+                const lines: string[] = [];
+                for (const word of words) {
+                  if (
+                    !lines.length ||
+                    (lines[lines.length - 1] + " " + word).length > 23
+                  )
+                    lines.push(word);
+                  else lines[lines.length - 1] += " " + word;
+                }
+                const visible = lines.slice(0, 3);
+                if (node.subLabel) visible.push(node.subLabel);
+                context.font = "11px Arial";
+                context.textAlign = "center";
+                const y = node.y + node.size + 17;
+                const width =
+                  Math.max(
+                    ...visible.map((line) => context.measureText(line).width),
+                    0,
+                  ) + 10;
+                context.fillStyle = "rgba(252,253,253,0.94)";
+                context.fillRect(
+                  node.x - width / 2,
+                  y - 12,
+                  width,
+                  visible.length * 15 + 5,
+                );
+                visible.forEach((line, index) => {
+                  context.fillStyle =
+                    index === visible.length - 1 && node.subLabel
+                      ? "#829692"
+                      : "#304d53";
+                  context.fillText(line, node.x, y + index * 15);
+                });
+              },
+            }
+          : {}),
         labelRenderedSizeThreshold: 5,
         hideEdgesOnMove: true,
         zIndex: true,
@@ -82,6 +140,16 @@ export default function GraphCanvas({
       return;
     }
     renderer.current = sigma;
+    // Panel toggles resize the container without changing the browser window.
+    let resizeFrame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        sigma.resize();
+        sigma.refresh();
+      });
+    });
+    observer.observe(container.current);
     sigma.on("clickNode", ({ node }) =>
       selectRef.current(byId.get(node) ?? null),
     );
@@ -93,6 +161,8 @@ export default function GraphCanvas({
       if (container.current) container.current.style.cursor = "grab";
     });
     return () => {
+      observer.disconnect();
+      cancelAnimationFrame(resizeFrame);
       renderer.current = null;
       sigma.kill();
     };
@@ -108,11 +178,11 @@ export default function GraphCanvas({
     sigma.setSetting("nodeReducer", (id, attrs) => ({
       ...attrs,
       ...(selected && id !== selected && !neighbors.has(id)
-        ? { color: "#c8d2d5", label: "" }
+        ? { color: "#c8d2d5" }
         : {}),
       ...(id === selected
         ? {
-            highlighted: true,
+            highlighted: false,
             forceLabel: true,
             zIndex: 10,
             size: Math.max(attrs.size, 6),
@@ -121,43 +191,27 @@ export default function GraphCanvas({
     }));
     sigma.setSetting("edgeReducer", (id, attrs) => ({
       ...attrs,
-      hidden:
-        !showEdges ||
-        Boolean(selected && !graph.extremities(id).includes(selected)),
+      hidden: !showEdges,
     }));
-    if (selected && graph.hasNode(selected)) {
-      const point = sigma.getNodeDisplayData(selected);
-      if (point)
-        void sigma
-          .getCamera()
-          .animate(
-            {
-              x: point.x,
-              y: point.y,
-              ratio:
-                graph.getNodeAttribute(selected, "kind") === "employee"
-                  ? 0.035
-                  : 0.2,
-            },
-            { duration: 400 },
-          );
-    }
   }, [selected, showEdges, data]);
   return (
     <div className="graph-stage">
-      <div
-        ref={container}
-        className="sigma-container"
-        role="img"
-        aria-label={`Граф организации: ${data.nodes.length} узлов`}
-      />
+      <div className="graph-scroll">
+        <div
+          ref={container}
+          className="sigma-container"
+          role="img"
+          aria-label={`Граф организации: ${data.nodes.length} узлов`}
+        />
+      </div>
       {error && (
         <div className="graph-error" role="alert">
           {error}
         </div>
       )}
       <div className="graph-hint">
-        <MousePointer2 size={14} /> Перемещайте карту · прокрутите для масштаба
+        <MousePointer2 size={14} /> Нажмите на узел с подчинёнными, чтобы
+        раскрыть уровень. Перетаскивание — перемещение, колесо — масштаб.
       </div>
       <div className="graph-controls">
         <button
